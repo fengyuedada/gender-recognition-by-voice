@@ -1,12 +1,12 @@
-import pyaudio
 import os
 import wave
-import librosa
-import numpy as np
-from sys import byteorder
 from array import array
 from struct import pack
+from sys import byteorder
 
+import librosa
+import numpy as np
+import pyaudio
 
 THRESHOLD = 500
 CHUNK_SIZE = 1024
@@ -15,28 +15,32 @@ RATE = 16000
 
 SILENCE = 30
 
+
 def is_silent(snd_data):
     "Returns 'True' if below the 'silent' threshold"
     return max(snd_data) < THRESHOLD
 
+
 def normalize(snd_data):
     "Average the volume out"
     MAXIMUM = 16384
-    times = float(MAXIMUM)/max(abs(i) for i in snd_data)
+    times = float(MAXIMUM) / max(abs(i) for i in snd_data)
 
     r = array('h')
     for i in snd_data:
-        r.append(int(i*times))
+        r.append(int(i * times))
     return r
+
 
 def trim(snd_data):
     "Trim the blank spots at the start and end"
+
     def _trim(snd_data):
         snd_started = False
         r = array('h')
 
         for i in snd_data:
-            if not snd_started and abs(i)>THRESHOLD:
+            if not snd_started and abs(i) > THRESHOLD:
                 snd_started = True
                 r.append(i)
 
@@ -53,12 +57,14 @@ def trim(snd_data):
     snd_data.reverse()
     return snd_data
 
+
 def add_silence(snd_data, seconds):
     "Add silence to the start and end of 'snd_data' of length 'seconds' (float)"
-    r = array('h', [0 for i in range(int(seconds*RATE))])
+    r = array('h', [0 for i in range(int(seconds * RATE))])
     r.extend(snd_data)
-    r.extend([0 for i in range(int(seconds*RATE))])
+    r.extend([0 for i in range(int(seconds * RATE))])
     return r
+
 
 def record():
     """
@@ -71,8 +77,8 @@ def record():
     """
     p = pyaudio.PyAudio()
     stream = p.open(format=FORMAT, channels=1, rate=RATE,
-        input=True, output=True,
-        frames_per_buffer=CHUNK_SIZE)
+                    input=True, output=True,
+                    frames_per_buffer=CHUNK_SIZE)
 
     num_silent = 0
     snd_started = False
@@ -106,10 +112,11 @@ def record():
     r = add_silence(r, 0.5)
     return sample_width, r
 
+
 def record_to_file(path):
     "Records from the microphone and outputs the resulting data to 'path'"
     sample_width, data = record()
-    data = pack('<' + ('h'*len(data)), *data)
+    data = pack('<' + ('h' * len(data)), *data)
 
     wf = wave.open(path, 'wb')
     wf.setnchannels(1)
@@ -117,7 +124,6 @@ def record_to_file(path):
     wf.setframerate(RATE)
     wf.writeframes(data)
     wf.close()
-
 
 
 def extract_feature(file_name, **kwargs):
@@ -145,16 +151,16 @@ def extract_feature(file_name, **kwargs):
         mfccs = np.mean(librosa.feature.mfcc(y=X, sr=sample_rate, n_mfcc=40).T, axis=0)
         result = np.hstack((result, mfccs))
     if chroma:
-        chroma = np.mean(librosa.feature.chroma_stft(S=stft, sr=sample_rate).T,axis=0)
+        chroma = np.mean(librosa.feature.chroma_stft(S=stft, sr=sample_rate).T, axis=0)
         result = np.hstack((result, chroma))
     if mel:
-        mel = np.mean(librosa.feature.melspectrogram(X, sr=sample_rate).T,axis=0)
+        mel = np.mean(librosa.feature.melspectrogram(X, sr=sample_rate).T, axis=0)
         result = np.hstack((result, mel))
     if contrast:
-        contrast = np.mean(librosa.feature.spectral_contrast(S=stft, sr=sample_rate).T,axis=0)
+        contrast = np.mean(librosa.feature.spectral_contrast(S=stft, sr=sample_rate).T, axis=0)
         result = np.hstack((result, contrast))
     if tonnetz:
-        tonnetz = np.mean(librosa.feature.tonnetz(y=librosa.effects.harmonic(X), sr=sample_rate).T,axis=0)
+        tonnetz = np.mean(librosa.feature.tonnetz(y=librosa.effects.harmonic(X), sr=sample_rate).T, axis=0)
         result = np.hstack((result, tonnetz))
     return result
 
@@ -162,8 +168,9 @@ def extract_feature(file_name, **kwargs):
 if __name__ == "__main__":
     # load the saved model (after training)
     # model = pickle.load(open("result/mlp_classifier.model", "rb"))
-    from utils import load_data, split_data, create_model
+    from utils import create_model
     import argparse
+
     parser = argparse.ArgumentParser(description="""Gender recognition script, this will load the model you trained, 
                                     and perform inference on a sample you provide (either using your voice or a file)""")
     parser.add_argument("-f", "--file", help="The path to the file, preferred to be in WAV format")
@@ -172,7 +179,7 @@ if __name__ == "__main__":
     # construct the model
     model = create_model()
     # load the saved/trained weights
-    model.load_weights("results/model.h5")
+    model.load_weights("model.h5")
     if not file or not os.path.isfile(file):
         # if file not provided, or it doesn't exist, use your voice
         print("Please talk")
@@ -188,4 +195,4 @@ if __name__ == "__main__":
     gender = "male" if male_prob > female_prob else "female"
     # show the result!
     print("Result:", gender)
-    print(f"Probabilities:     Male: {male_prob*100:.2f}%    Female: {female_prob*100:.2f}%")
+    print(f"Probabilities:     Male: {male_prob * 100:.2f}%    Female: {female_prob * 100:.2f}%")
